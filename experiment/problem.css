@@ -1,0 +1,15 @@
+<style>
+    #feelingPopup {
+      display: none;
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: white;
+      padding: 20px;
+      border-radius: 12px;
+      box-shadow: 0 4px 12px #00000033;
+      z-index: 9999;
+      text-align: center;
+      width: 600px; /* 横幅を倍に */
+    }

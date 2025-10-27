@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>数学クイズ</title>
+<style>
+  body {
+    font-family: sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 20px;
+    background-color: #f0f8ff;
+  }
+  .card {
+    background: white;
+    padding: 20px;
+    border-radius: 16px;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+    text-align: center;
+    max-width: 95%;
+    width: 100%;
+  }
+  input {
+    margin-top: 10px;
+    padding: 8px;
+    width: 100%;
+    box-sizing: border-box;
+  }
+  canvas {
+    border: 1px solid #ccc;
+    margin-top: 10px;
+    background: #fff;
+    touch-action: none;
+    width: 100%;
+    height: 250px; /* iPad縦画面で描きやすい高さ */
+  }
+  button {
+    margin: 10px 5px 0;
+    padding: 10px 20px;
+    border: none;
+    border-radius: 8px;
+    background-color: #4682b4;
+    color: white;
+    font-size: 16px;
+    cursor: pointer;
+  }
+  button:hover {
+    background-color: #5a9bd4;
+  }
+  #attribution {
+    margin-top: 20px;
+    display: none;
+    flex-direction: column;
+  }
+  #attribution button {
+    background-color: white;
+    color: #333;
+    border: 1px solid #ccc;
+    margin: 5px 0;
+  }
+  #attribution button:hover {
+    background-color: #f0f0f0;
+  }
+  #download, #thankMessage, #timerDisplay {
+    margin-top: 20px;
+  }
+  label {
+    margin-top: 15px;
+    display: block;
+    text-align: left;
+    font-weight: bold;
+  }
+  #feelingPopup {
+    display: none;
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: white;
+    padding: 20px;
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    z-index: 9999;
+    text-align: center;
+    width: 80%;
+    max-width: 500px;
+  }
+  #feelingPopup input[type=range] {
+    width: 100%;
+  }
+</style>
+</head>
+<body>
+<div class="card">
+  <h2 id="question">読み込み中...</h2>
+  <div id="timerDisplay" style="font-weight: bold; font-size: 18px;"></div>
+
+  <label for="memoCanvas">🖊 メモ欄（手書き）</label>
+  <canvas id="memoCanvas"></canvas><br>
+  <button onclick="clearCanvas()">メモを消す</button>
+
+  <input type="text" id="answer" placeholder="答えを入力" />
+  <div>
+    <button id="submitBtn" onclick="submitAnswer()">解答する</button>
+    <button id="giveUpBtn" onclick="showAttributionOptions()">諦める</button>
+  </div>
+
+  <div id="attribution">
+    <p>なぜ諦めたと思いますか？</p>
+    <button onclick="selectAttribution('努力帰属')">今までこのような問題を勉強してこなかった。努力が足りなかった。</button>
+    <button onclick="selectAttribution('能力帰属')">自分には向いていない。能力がない。</button>
+    <button onclick="selectAttribution('運帰属')">運が悪かった。違う問題だったら解けたかもしれない。</button>
+    <button onclick="selectAttribution('課題の困難さ帰属')">難しすぎる問題だ。こんな問題は誰にも解けないだろう。</button>
+  </div>
+
+  <p id="thankMessage" style="font-weight:bold;color:#333;"></p>
+  <div id="download"></div>
+</div>
+
+<div id="feelingPopup">
+  <p>今の気分はどのあたりですか？</p>
+  <div id="countdownDisplay" style="font-weight:bold; color:red; margin-bottom:10px;"></div>
+  <input type="range" id="feelingSlider" min="0" max="100" step="1">
+  <br><span style="float:left">解けそう</span>
+  <span style="float:right">解けなそう</span>
+  <br><br>
+  <button onclick="closeFeelingPopup()">OK</button>
+</div>
+
+<script>
+
+
+// ここから絶対パス化したクイズ一覧
+const quiz = [
+    { qHTML: `以下の文章を読み、問いに答えよ。<br><img src="${basePath}images/quiz5.png" width="600"> 理性による「対象から主体への転回」をカントは何と呼んだか。`, a: "50" },
+  { qHTML: `以下の文章を読み、問いに答えよ。<br><img src="${basePath}images/quiz5.png" width="600"> 経験に先立つ感性の形式は何か？`, a: "50" },
+  { qHTML: `以下の文章を読み、問いに答えよ。<br><img src="${basePath}images/quiz5.png" width="600"> 現象を統一して経験を可能にする概念群は？`, a: "50" },
+  { qHTML: `以下の文章を読み、問いに答えよ。<br><img src="${basePath}images/quiz5.png" width="600"> 理性が自らの限界を完全に理解することは可能か？`, a: "50" },
+  { qHTML: `lとmは平行である。以下のxを求めよ。<br><img src="${basePath}images/quiz1.png" width="200">`, a: "50" },
+  { qHTML: `lとmは平行である。以下のxを求めよ。<br><img src="${basePath}images/quiz2.png" width="200">`, a: "50" },
+  { qHTML: `以下のxを求めよ。<br><img src="${basePath}images/quiz3.png" width="200">`, a: "50" },
+  { qHTML: `以下のxを求めよ。<br><img src="${basePath}images/quiz4.png" width="200">`, a: "50" },
+  { qHTML: "ギリギリの時間に鬼が食べそうなものは何？", a: "おにぎり" },
+  { qHTML: "豚が寝る場所はどこ？", a: "3" },
+  { qHTML: "あっという間に10歳になったらどんな動物になりそう？", a: "猛獣" },
+  { qHTML: "事故があると震えてしまう植物ってなんだ？", a: "解答なし" },
+];
+
+
+let current = 0;
+let attributionLog = [];
+let feelingLog = [];
+let timer;
+
+// クイズ表示
+function showQuestion() {
+  if(current >= quiz.length) return endExperiment();
+  document.getElementById("question").innerHTML = quiz[current].qHTML;
+  document.getElementById("answer").value = "";
+  clearCanvas();
+  document.getElementById("attribution").style.display = "none";
+  document.getElementById("thankMessage").innerText = "";
+}
+
+// 解答処理
+function submitAnswer() {
+  const time = new Date().toLocaleString();
+  const answerValue = document.getElementById("answer").value;
+  attributionLog.push({
+    question: quiz[current].qHTML,
+    attribution: answerValue,
+    timestamp: time
+  });
+  current++;
+  showQuestion();
+}
+
+// 諦めボタン
+function showAttributionOptions() { document.getElementById("attribution").style.display = "flex"; }
+function selectAttribution(reason) {
+  const time = new Date().toLocaleString();
+  attributionLog.push({ question: quiz[current].qHTML, attribution: reason, timestamp: time });
+  current++;
+  showQuestion();
+}
+
+// CSVダウンロード
+function showDownloadLink() {
+  const rows = [["問題", "回答/帰属理由", "時間"]];
+  attributionLog.forEach(entry => rows.push([entry.question.replace(/<[^>]+>/g,""), entry.attribution, entry.timestamp]));
+  rows.push(["タイミング", "気分スライダー値"]);
+  feelingLog.forEach(entry => rows.push([entry.timestamp, entry.value]));
+  const csvContent = rows.map(r => r.join(",")).join("\n");
+  const blob = new Blob(["\uFEFF" + csvContent], {type:"text/csv;charset=utf-8;"});
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(blob);
+  link.download = "experiment_log.csv";
+  link.innerText = "回答内容をCSVでダウンロード";
+  document.getElementById("download").innerHTML="";
+  document.getElementById("download").appendChild(link);
+}
+
+// メモ欄
+const canvas = document.getElementById("memoCanvas");
+const ctx = canvas.getContext("2d");
+let drawing = false;
+
+function getMousePos(evt){ const rect = canvas.getBoundingClientRect(); return { x: evt.clientX - rect.left, y: evt.clientY - rect.top }; }
+function startDraw(evt){ drawing=true; const pos=getMousePos(evt); ctx.beginPath(); ctx.moveTo(pos.x,pos.y); }
+function draw(evt){ if(!drawing) return; const pos=getMousePos(evt); ctx.lineTo(pos.x,pos.y); ctx.stroke(); }
+function endDraw(){ drawing=false; }
+function clearCanvas(){ ctx.clearRect(0,0,canvas.width,canvas.height); }
+
+canvas.addEventListener("mousedown", startDraw);
+canvas.addEventListener("mousemove", draw);
+canvas.addEventListener("mouseup", endDraw);
+canvas.addEventListener("mouseout", endDraw);
+
+canvas.addEventListener("touchstart", function(e){
+  e.preventDefault();
+  const touch = e.touches[0];
+  canvas.dispatchEvent(new MouseEvent("mousedown", {clientX: touch.clientX, clientY: touch.clientY}));
+},{passive:false});
+canvas.addEventListener("touchmove", function(e){
+  e.preventDefault();
+  const touch = e.touches[0];
+  canvas.dispatchEvent(new MouseEvent("mousemove",{clientX: touch.clientX, clientY: touch.clientY}));
+},{passive:false});
+canvas.addEventListener("touchend", function(e){
+  e.preventDefault();
+  canvas.dispatchEvent(new MouseEvent("mouseup",{}));
+});
+
+// 初期処理
+showQuestion();
+</script>
+</body>
+</html>
